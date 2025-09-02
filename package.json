@@ -12,5 +12,8 @@
   "packageManager": "pnpm@10.14.0",
   "devDependencies": {
     "typescript": "5.9.2"
+  },
+  "dependencies": {
+    "effect": "3.17.10"
   }
 }
