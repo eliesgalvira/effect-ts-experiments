@@ -12,6 +12,9 @@ importers:
         specifier: 3.17.10
         version: 3.17.10
     devDependencies:
+      '@types/node':
+        specifier: 24.3.0
+        version: 24.3.0
       typescript:
         specifier: 5.9.2
         version: 5.9.2
@@ -20,6 +23,9 @@ packages:
 
   '@standard-schema/spec@1.0.0':
     resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
+
+  '@types/node@24.3.0':
+    resolution: {integrity: sha512-aPTXCrfwnDLj4VvXrm+UUCQjNEvJgNA8s5F1cvwQU+3KNltTOkBm1j30uNLyqqPNe7gE3KFzImYoZEfLhp4Yow==}
 
   effect@3.17.10:
     resolution: {integrity: sha512-CF88II9feS/adKbaW+2yyVg75O2gN6TIIuRslVtND9DQR1kYFOqFImgDuhsfg2goEAOJEOYTuNautT5ICyMbxA==}
@@ -36,9 +42,16 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  undici-types@7.10.0:
+    resolution: {integrity: sha512-t5Fy/nfn+14LuOc2KNYg75vZqClpAiqscVvMygNnlsHBFpSXdJaYtXMcdNLpl/Qvc3P2cB3s6lOV51nqsFq4ag==}
+
 snapshots:
 
   '@standard-schema/spec@1.0.0': {}
+
+  '@types/node@24.3.0':
+    dependencies:
+      undici-types: 7.10.0
 
   effect@3.17.10:
     dependencies:
@@ -52,3 +65,5 @@ snapshots:
   pure-rand@6.1.0: {}
 
   typescript@5.9.2: {}
+
+  undici-types@7.10.0: {}
