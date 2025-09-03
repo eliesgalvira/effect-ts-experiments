@@ -9,7 +9,7 @@ const jsonResponse = (response: Response) =>
 
 const main = Effect.flatMap(
     fetchRequest,
-    (response: Response) => jsonResponse(response)
+    jsonResponse
 );
 
 Effect.runPromise(main);
