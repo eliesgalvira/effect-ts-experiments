@@ -20,12 +20,13 @@ const jsonResponse = (response: Response) => Effect.tryPromise({
     catch: (): JsonError => ({ _tag: "JsonError" })
 });
 
-/// Effect<unknown, FetchError | JsonError>
+/// Effect<unknown, never>
 const main = fetchRequest.pipe(
     Effect.flatMap(jsonResponse),
-    Effect.catchAll(
-        (e) => Effect.succeed<string>(e._tag)
-    ),
+    Effect.catchTags({
+        FetchError: () => Effect.succeed<string>("Fetch Error"),
+        JsonError: () => Effect.succeed<string>("Json Error"),
+    }),
     Effect.tap(Console.log)
 );
 
