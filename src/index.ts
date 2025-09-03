@@ -1,16 +1,32 @@
-import { Effect } from "effect";
+import { Console, Effect } from "effect";
 
-/// Effect<Response, UnknownException>
-const fetchRequest = Effect.tryPromise(
-    () => fetch("https://pokeapi.co/api/v2/pokemon/garchomp/")
-);
+interface FetchError {
+    readonly _tag: "FetchError";
+}
+
+interface JsonError {
+    readonly _tag: "JsonError";
+}
+
+/// Effect<Response, FetchError>
+const fetchRequest = Effect.tryPromise({
+    try: () => fetch("https://pokeapi.co/api/v2/pokemon/gargomp/"),
+    catch: (): FetchError => ({ _tag: "FetchError" })
+});
   
-/// Effect<unknown, UnknownException>
-const jsonResponse = (response: Response) => Effect.tryPromise(
-() => response.json()
-);
+/// Effect<unknown, JsonError>
+const jsonResponse = (response: Response) => Effect.tryPromise({
+    try: () => response.json(),
+    catch: (): JsonError => ({ _tag: "JsonError" })
+});
 
-/// Effect<unknown, UnknownException>
-const main = Effect.flatMap(fetchRequest, jsonResponse);
+/// Effect<unknown, FetchError | JsonError>
+const main = fetchRequest.pipe(
+    Effect.flatMap(jsonResponse),
+    Effect.catchAll(
+        (e) => Effect.succeed<string>(e._tag)
+    ),
+    Effect.tap(Console.log)
+);
 
 Effect.runPromise(main);
