@@ -1,6 +1,6 @@
 import { Console, Effect, Schema, Config } from "effect";
-import { FetchError, JsonError } from "./errors.js";
-import { Pokemon } from "./schema.js";
+import { FetchError, JsonError } from "./errors.ts";
+import { Pokemon } from "./schema.ts";
 
 const config = Config.string("BASE_URL")
 
