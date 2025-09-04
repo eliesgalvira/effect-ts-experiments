@@ -39,7 +39,10 @@
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
-    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
+
+    // Custom options
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
   }
 }
