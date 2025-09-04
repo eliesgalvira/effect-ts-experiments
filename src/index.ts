@@ -24,16 +24,21 @@ const jsonResponse = (response: Response) => Effect.tryPromise({
     catch: () => new JsonError({ customMessage: "There was an error parsing the data" })
 });
 
+/// Effect<unknown, JsonError | FetchError>
+const program = Effect.gen(function* () {
+    const response = yield* fetchRequest;
+    if (!response.ok) {
+        return yield* new FetchError({ customMessage: "There was an error fetching the data" });
+    }
+
+    return yield* jsonResponse(response);
+});
+
 /// Effect<unknown, never>
-const main = fetchRequest.pipe(
-    Effect.filterOrFail(
-        (response) => response.ok,
-        () => new FetchError({ customMessage: "There was an error fetching the data" })
-    ),
-    Effect.flatMap(jsonResponse),
+const main = program.pipe(
     Effect.catchTags({
-        FetchError: () => Effect.succeed<string>("Fetch Error"),
-        JsonError: () => Effect.succeed<string>("Json Error"),
+        FetchError: (error) => Effect.succeed<string>(error.customMessage),
+        JsonError: (error) => Effect.succeed<string>(error.customMessage),
     }),
     Effect.tap(Console.log)
 );
