@@ -1,18 +1,8 @@
-import { Console, Effect, Data, Schema, Config } from "effect";
+import { Console, Effect, Schema, Config } from "effect";
+import { FetchError, JsonError } from "./errors.js";
+import { Pokemon } from "./schema.js";
 
 const config = Config.string("BASE_URL")
-
-class Pokemon extends Schema.Class<Pokemon>("Pokemon")({
-    id: Schema.Number,
-    order: Schema.Number,
-    name: Schema.String,
-    height: Schema.Number,
-    weight: Schema.Number,
-}) {};
-
-class FetchError extends Data.TaggedError("FetchError")<{ customMessage: string }> {};
-
-class JsonError extends Data.TaggedError("JsonError")<{ customMessage: string }> {};
 
 const getPokemon = Effect.gen(function* () {
     const baseUrl = yield* config;
