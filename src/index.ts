@@ -1,31 +1,19 @@
 import { Console, Effect, Data, Schema } from "effect";
 
-const Pokemon = Schema.Struct({
+class Pokemon extends Schema.Class<Pokemon>("Pokemon")({
     id: Schema.Number,
     order: Schema.Number,
     name: Schema.String,
     height: Schema.Number,
     weight: Schema.Number,
-});
+}) {};
+class FetchError extends Data.TaggedError("FetchError")<{ customMessage: string }> {};
 
-/// Effect<unknown, ParseError>
-const decodePokemon = Schema.decodeUnknown(Pokemon);
-
-class FetchError extends Data.TaggedError("FetchError")<
-    {
-        customMessage: string;
-    }
-> {}
-
-class JsonError extends Data.TaggedError("JsonError")<
-    {
-        customMessage: string;
-    }
-> {}
+class JsonError extends Data.TaggedError("JsonError")<{ customMessage: string }> {};
 
 /// Effect<Response, FetchError>
 const fetchRequest = Effect.tryPromise({
-    try: () => fetch("https://pokeapi.co/api/v2/pokemon/gargomp/"),
+    try: () => fetch("https://pokeapi.co/api/v2/pokemon/garchomp/"),
     catch: () => new FetchError({ customMessage: "There was an error fetching the data" })
 });
   
@@ -34,6 +22,9 @@ const jsonResponse = (response: Response) => Effect.tryPromise({
     try: () => response.json(),
     catch: () => new JsonError({ customMessage: "There was an error parsing the data" })
 });
+
+/// Effect<unknown, ParseError>
+const decodePokemon = Schema.decodeUnknown(Pokemon);
 
 /// Effect<unknown, JsonError | FetchError | ParseError>
 const program = Effect.gen(function* () {
