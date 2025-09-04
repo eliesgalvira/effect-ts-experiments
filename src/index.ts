@@ -22,6 +22,12 @@ const jsonResponse = (response: Response) => Effect.tryPromise({
 
 /// Effect<unknown, never>
 const main = fetchRequest.pipe(
+    Effect.filterOrFail(
+        (response) => response.ok,
+        (): FetchError => ({
+            _tag: "FetchError",
+        })
+    ),
     Effect.flatMap(jsonResponse),
     Effect.catchTags({
         FetchError: () => Effect.succeed<string>("Fetch Error"),
