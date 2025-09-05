@@ -9,11 +9,11 @@ const getPokemon = Effect.gen(function* () {
 
     const response = yield* Effect.tryPromise({
         try: () => fetch(`${baseUrl}/api/v2/pokemon/garchomp/`),
-        catch: () => new FetchError({ customMessage: "There was an error fetching the data" })
+        catch: () => new FetchError({ customMessage: "There was an error fetching the data, promise failed" })
     });
 
     if (!response.ok) {
-        return yield* new FetchError({ customMessage: "There was an error fetching the data" });
+        return yield* new FetchError({ customMessage: "There was an error fetching the data, response not ok" });
     }
 
     const json = yield* Effect.tryPromise({
@@ -21,6 +21,7 @@ const getPokemon = Effect.gen(function* () {
         catch: () => new JsonError({ customMessage: "There was an error parsing the data" })
     });
 
+    // Effect<Pokemon, ParseError>
     return yield* Schema.decodeUnknown(Pokemon)(json);
 });
 
