@@ -9,8 +9,10 @@ export class BuildPokeApiUrl extends Context.Tag("BuildPokeApiUrl")<
   static readonly Live = Layer.effect(
     this, 
     Effect.gen(function* () {
-        const pokeApiUrl = yield* PokeApiUrl; // 👈 Create dependency
-        return BuildPokeApiUrl.of(({ name }) => `${pokeApiUrl}/${name}`);
+      const pokeApiUrl = yield* PokeApiUrl; // 👈 Create dependency
+      return BuildPokeApiUrl.of(({ name }) => `${pokeApiUrl}/${name}`);
     })
+  ).pipe(
+    Layer.provide(PokeApiUrl.Live)
   );
 }
