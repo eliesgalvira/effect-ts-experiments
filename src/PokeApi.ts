@@ -5,14 +5,6 @@ import { Pokemon } from "./schema.ts";
 import { PokemonCollection } from "./PokemonCollection.ts";
 import { BuildPokeApiUrl } from "./BuildPokeApiUrl.ts";
 
-interface PokeApiImpl {
-  readonly getPokemon: Effect.Effect<
-    Pokemon,
-    FetchError | JsonError | ParseResult.ParseError | ConfigError,
-    BuildPokeApiUrl | PokemonCollection
-  >;
-}
-
 const make = { 
   getPokemon: Effect.gen(function* () {
     const pokemonCollection = yield* PokemonCollection; // 👈 Create dependency
