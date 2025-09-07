@@ -1,5 +1,4 @@
 import { Effect, Context, type ParseResult, Schema, Layer } from "effect";
-import type { ConfigError } from "effect/ConfigError";
 import { FetchError, JsonError } from "./errors.ts";
 import { Pokemon } from "./schema.ts";
 import { PokemonCollection } from "./PokemonCollection.ts";
@@ -44,5 +43,18 @@ export class PokeApi extends Context.Tag("PokeApi")<
       PokemonCollection.Live,
       BuildPokeApiUrl.Live,
     ))
+  );
+
+  static readonly Mock = Layer.succeed(
+    this,
+    PokeApi.of({
+      getPokemon: Effect.succeed({
+        id: 1,
+        height: 10,
+        weight: 10,
+        name: "my-name",
+        order: 1,
+      }),
+    })
   );
 }
