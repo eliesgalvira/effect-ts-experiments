@@ -1,15 +1,7 @@
 import { Console, Effect, Layer } from "effect";
 import { PokeApi } from "./PokeApi.ts";
-import { PokeApiUrl } from "./PokeApiUrl.ts";
-import { PokemonCollection } from "./PokemonCollection.ts";
-import { BuildPokeApiUrl } from "./BuildPokeApiUrl.ts";
 
-const MainLayer = Layer.mergeAll(
-    PokeApi.Live,
-    PokemonCollection.Live,
-    PokeApiUrl.Live,
-    BuildPokeApiUrl.Live
-);
+const MainLayer = Layer.mergeAll(PokeApi.Live);
 
 const program = Effect.gen(function* () {
     const pokeApi = yield* PokeApi;

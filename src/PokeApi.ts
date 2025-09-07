@@ -5,36 +5,44 @@ import { Pokemon } from "./schema.ts";
 import { PokemonCollection } from "./PokemonCollection.ts";
 import { BuildPokeApiUrl } from "./BuildPokeApiUrl.ts";
 
-const make = { 
-  getPokemon: Effect.gen(function* () {
-    const pokemonCollection = yield* PokemonCollection; // 👈 Create dependency
-    const buildPokeApiUrl = yield* BuildPokeApiUrl; // 👈 Create dependency
+const make = Effect.gen(function* () {
+  const pokemonCollection = yield* PokemonCollection;
+  const buildPokeApiUrl = yield* BuildPokeApiUrl;
 
-    // 👇 `buildPokeApiUrl` is the function from `BuildPokeApiUrl`
-    const requestUrl = buildPokeApiUrl({
-      /// 👇 `pokemonCollection` is a `NonEmpty` list of `string`
-      name: pokemonCollection[0],
-    });
+  return {
+    getPokemon: Effect.gen(function* () {
+      const requestUrl = buildPokeApiUrl({
+        name: pokemonCollection[0],
+      });
 
-    const response = yield* Effect.tryPromise({
-      try: () => fetch(requestUrl),
-      catch: () => new FetchError({ customMessage: "Failed to fetch pokemon, promise failed" }),
-    });
+      const response = yield* Effect.tryPromise({
+        try: () => fetch(requestUrl),
+        catch: () => new FetchError({ customMessage: "Failed to fetch pokemon, promise failed" }),
+      });
 
-    if (!response.ok) {
-      return yield* new FetchError({ customMessage: "Failed to fetch pokemon, response not ok" });
-    }
+      if (!response.ok) {
+        return yield* new FetchError({ customMessage: "Failed to fetch pokemon, response not ok" });
+      }
 
-    const json = yield* Effect.tryPromise({
-      try: () => response.json(),
-      catch: (): JsonError => new JsonError({ customMessage: "Failed to parse pokemon" }),
-    });
+      const json = yield* Effect.tryPromise({
+        try: () => response.json(),
+        catch: (): JsonError => new JsonError({ customMessage: "Failed to parse pokemon" }),
+      });
 
-    return yield* Schema.decodeUnknown(Pokemon)(json);
-  }),
-};
+      return yield* Schema.decodeUnknown(Pokemon)(json);
+    }),
+  };
+});
 
 
-export class PokeApi extends Context.Tag("PokeApi")<PokeApi, typeof make>() {
-  static readonly Live = Layer.succeed(this, make);
+export class PokeApi extends Context.Tag("PokeApi")<
+  PokeApi,
+  Effect.Effect.Success<typeof make>
+>() {
+  static readonly Live = Layer.effect(this, make).pipe(
+    Layer.provide(Layer.mergeAll(
+      PokemonCollection.Live,
+      BuildPokeApiUrl.Live,
+    ))
+  );
 }
