@@ -1,7 +1,8 @@
-import { Console, Effect, Layer } from "effect";
+import { Console, Effect, Layer, type ParseResult } from "effect";
 import { PokeApi } from "./PokeApi.ts";
+import { FetchError, JsonError } from "./errors.ts";
 
-const MainLayer = Layer.mergeAll(PokeApi.Live);
+const MainLayer = Layer.mergeAll(PokeApi.Default);
 
 const program = Effect.gen(function* () {
     const pokeApi = yield* PokeApi;
@@ -12,9 +13,9 @@ const runnable = program.pipe(Effect.provide(MainLayer));
 
 const main = runnable.pipe(
     Effect.catchTags({
-        FetchError: (error) => Effect.succeed<string>(error.customMessage),
-        JsonError: (error) => Effect.succeed<string>(error.customMessage),
-        ParseError: (error) => Effect.succeed<string>(error.message),
+        FetchError: (error: FetchError) => Effect.succeed<string>(error.customMessage),
+        JsonError: (error: JsonError) => Effect.succeed<string>(error.customMessage),
+        ParseError: (error: ParseResult.ParseError) => Effect.succeed<string>(error.message),
     }),
     Effect.tap(Console.log)
 );
