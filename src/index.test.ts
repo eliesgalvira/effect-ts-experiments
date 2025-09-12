@@ -1,8 +1,10 @@
-import { Effect, ConfigProvider, Layer } from "effect";
+import { Effect, ConfigProvider, Layer, ManagedRuntime, Console } from "effect";
+import type { ParseResult } from "effect";
 import { PokeApi } from "./PokeApi.ts";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import { server } from "../test/node.ts";
 import { expect, it } from "vitest";
+import { FetchError, JsonError } from "./errors.ts";
 
 beforeAll(() => server.listen());
 afterEach(() => server.resetHandlers());
@@ -15,16 +17,25 @@ const TestConfigProvider = ConfigProvider.fromMap(
 const ConfigProviderLayer = Layer.setConfigProvider(TestConfigProvider);
 const MainLayer = PokeApi.Default.pipe(Layer.provide(ConfigProviderLayer));
 
+const PokemonRuntimeTest = ManagedRuntime.make(MainLayer);
+
 const program = Effect.gen(function* () {
 const pokeApi = yield* PokeApi;
 return yield* pokeApi.getPokemon;
 });
 
-// 👇 Provide the `PokeApi` live implementation to test
-const main = program.pipe(Effect.provide(MainLayer));
+const main = program.pipe(
+    Effect.catchTags({
+        FetchError: (error: FetchError) => Effect.succeed<string>(error.customMessage),
+        JsonError: (error: JsonError) => Effect.succeed<string>(error.customMessage),
+        ParseError: (error: ParseResult.ParseError) => Effect.succeed<string>(error.message),
+    }),
+    Effect.tap(Console.log)
+);
+
 
 it("returns a valid pokemon", async () => {
-const response = await Effect.runPromise(main);
+const response = await PokemonRuntimeTest.runPromise(main);
 expect(response).toEqual({
     id: 1,
     height: 10,
