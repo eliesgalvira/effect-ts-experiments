@@ -12,8 +12,20 @@ const randomNumberEffect: () => number = () => Math.random();
 
 const run = <A>(effect: Effect<A>): A => {
   const result = effect();
-  console.log(`RESULT: ${result}`);
+  console.log("RESULT:");
+  console.log(result);
   return result;
+};
+
+const runSafe = <A>(effect: Effect<A>): void => {
+  try {
+    const result = effect();
+    console.log("RESULT:");
+    console.log(result);
+  } catch (error) {
+    console.error("EFFECT FAILED");
+    console.error(error);
+  }
 };
 
 // WHAT POWERS DOES THE EFFECT GIVE US?
@@ -29,8 +41,8 @@ const repeat =
     return results;
   };
 
+console.log("COMPOSING REPEAT")
 run(repeat(repeat(randomNumberEffect, 2), 2));
-
 console.log();
 
 // RETRYABILITY
@@ -71,10 +83,13 @@ const eventually =
     }
   };
 
-//run(retry(failingEffect, 5));
+console.log("RETRY");
+runSafe(retry(failingEffect, 5));
+console.log();
 
-//console.log();
-//run(eventually(failingEffect));
+console.log("EVENTUALLY");
+runSafe(eventually(failingEffect));
+console.log();
 
 // AROUNDABILITY / INSTRUMENTABILITY / DECORABILITY
 // thunk = () => {before... thunk after...}
@@ -91,8 +106,11 @@ const timed =
 
 
 const timedFailure = timed(eventually(failingEffect));
-const result = run(timedFailure);
-console.log(result);
+console.log("EVENTUALLY TIMED");
+runSafe(timedFailure);
+console.log();
+
+// COMPOSITION OPERATORS
 
 const log =
   (message: string): Effect<void> =>
@@ -100,7 +118,6 @@ const log =
     console.log(message);
   };
 
-// COMPOSITION OPERATORS
 // flatMap
 const andThen =
   <A, B>(effect: Effect<A>, f: (value: A) => Effect<B>): Effect<B> =>
