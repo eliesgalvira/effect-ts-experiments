@@ -27,7 +27,7 @@ const repeat =
       results.push(effect());
     }
     return results;
-};
+  };
 
 run(repeat(repeat(randomNumberEffect, 2), 2));
 
@@ -37,8 +37,8 @@ console.log();
 
 const failingEffect: Effect<number> = () => {
   const x = Math.random();
-  if (x < 0.7) {
-    console.log(`OOPS: ${x}`);
+  if (x < 0.99999) {
+    //console.log(`OOPS: ${x}`);
     throw new Error("Failed");
   } else {
     return x;
@@ -71,7 +71,47 @@ const eventually =
     }
   };
 
-run(retry(failingEffect, 5));
+//run(retry(failingEffect, 5));
 
-console.log();
-run(eventually(failingEffect));
+//console.log();
+//run(eventually(failingEffect));
+
+// AROUNDABILITY / INSTRUMENTABILITY / DECORABILITY
+// thunk = () => {before... thunk after...}
+
+const timed =
+  <A>(effect: Effect<A>): Effect<[duration: number, result: A]> =>
+  () => {
+    const start = Date.now();
+    const result = effect();
+    const end = Date.now();
+    const duration = end - start;
+    return [duration, result];
+  };
+
+
+const timedFailure = timed(eventually(failingEffect));
+const result = run(timedFailure);
+console.log(result);
+
+const log =
+  (message: string): Effect<void> =>
+  () => {
+    console.log(message);
+  };
+
+// COMPOSITION OPERATORS
+// flatMap
+const andThen =
+  <A, B>(effect: Effect<A>, f: (value: A) => Effect<B>): Effect<B> =>
+  () => {
+    const a = effect();
+    const effectB = f(a);
+    return effectB();
+  };
+
+const composed = andThen(timedFailure, ([duration, result]) =>
+  log(`DURATION: ${duration}ms and RESULT: ${result}`)
+);
+
+run(composed);
