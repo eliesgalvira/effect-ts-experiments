@@ -131,4 +131,31 @@ const composed = andThen(timedFailure, ([duration, result]) =>
   log(`DURATION: ${duration}ms and RESULT: ${result}`)
 );
 
-run(composed);
+console.log("COMPOSED");
+runSafe(composed);
+console.log();
+
+function gen<R>(makeIter: () => Generator<Effect<any>, R, any>): Effect<R> {
+  return () => {
+    const iter = makeIter();
+    let next = iter.next(); // { value: Effect<any> | R, done: boolean }
+
+    while (!next.done) {
+      const eff = next.value as Effect<any>;
+      const value = eff();
+
+      next = iter.next(value);
+    }
+
+    return next.value as R;
+  };
+}
+
+const composedGen = gen(function* () {
+  const [duration, result] = yield timedFailure;
+  yield log(`DURATION: ${duration}ms and RESULT: ${result}`);
+  return "YAY";
+});
+
+console.log("COMPOSED GEN");
+runSafe(composedGen);
