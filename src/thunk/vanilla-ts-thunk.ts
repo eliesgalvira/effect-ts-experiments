@@ -10,9 +10,15 @@ type Effect<A> = () => A;
 
 const randomNumberEffect: () => number = () => Math.random();
 
-const run = <A>(effect: Effect<A>) => console.log(effect());
+const run = <A>(effect: Effect<A>): A => {
+  const result = effect();
+  console.log(`RESULT: ${result}`);
+  return result;
+};
 
 // WHAT POWERS DOES THE EFFECT GIVE US?
+
+// REPEATABILITY
 const repeat =
   <A>(effect: Effect<A>, count: number): Effect<A[]> =>
   () => {
