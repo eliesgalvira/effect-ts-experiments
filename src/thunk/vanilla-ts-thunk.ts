@@ -44,6 +44,9 @@ const repeat =
 console.log("COMPOSING REPEAT")
 run(repeat(repeat(randomNumberEffect, 2), 2));
 console.log();
+console.log("COMPOSING REPEAT with no run function");
+console.log(repeat(repeat(randomNumberEffect, 2), 2)());
+console.log();
 
 // RETRYABILITY
 
@@ -90,6 +93,9 @@ console.log();
 console.log("EVENTUALLY");
 runSafe(eventually(failingEffect));
 console.log();
+console.log("EVENTUALLY with no run function");
+console.log(eventually(failingEffect)());
+console.log();
 
 // AROUNDABILITY / INSTRUMENTABILITY / DECORABILITY
 // thunk = () => {before... thunk after...}
@@ -109,6 +115,8 @@ const timedFailure = timed(eventually(failingEffect));
 console.log("EVENTUALLY TIMED");
 runSafe(timedFailure);
 console.log();
+console.log("EVENTUALLY TIMED with no run function");
+console.log(timedFailure());
 
 // COMPOSITION OPERATORS
 
@@ -159,3 +167,5 @@ const composedGen = gen(function* () {
 
 console.log("COMPOSED GEN");
 runSafe(composedGen);
+console.log("COMPOSED GEN with no run function");
+console.log(composedGen());
