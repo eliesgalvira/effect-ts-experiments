@@ -1,4 +1,5 @@
-import { Schema, Effect } from "effect";
+import { Console, Schema, Effect } from "effect";
+import { ExpectedLiteralError, CouldNotFindLiteralError } from "./errors.ts";
 
 export function typedString() {
   return <const Schemas extends readonly Schema.Schema<any, any, never>[]>(
@@ -15,7 +16,7 @@ export function typedString() {
 
           if (!input.startsWith(literal, pos)) {
             return yield* Effect.fail(
-              new Error(`Expected "${literal}" at position ${pos}`)
+              new ExpectedLiteralError({message: `Expected "${literal}" at position ${pos}` })
             );
           }
           pos += literal.length;
@@ -26,7 +27,7 @@ export function typedString() {
 
             if (nextPos === -1) {
               return yield* Effect.fail(
-                new Error(`Could not find "${nextLiteral}" after position ${pos}`)
+                new CouldNotFindLiteralError({ message: `Could not find "${nextLiteral}" after position ${pos}` })
               );
             }
 
@@ -44,4 +45,17 @@ export function typedString() {
 // Usage - exactly like Effect's pattern
 const matcher = typedString()`example/${Schema.NumberFromString}what&${Schema.NumberFromString}`;
 
-Effect.runPromise(matcher("example/34what&3")).then(console.log).catch(console.error);
+const program = Effect.gen(function* () {
+  const result = yield* matcher("example/34what&3");
+  return result;
+});
+
+const main = program.pipe(
+  Effect.catchTags({
+    ExpectedLiteralError: (error: ExpectedLiteralError) => Effect.succeed(error.message),
+    CouldNotFindLiteralError: (error: CouldNotFindLiteralError) => Effect.succeed(error.message),
+  }),
+  Effect.tap(Console.log)
+);
+
+Effect.runPromise(main);
