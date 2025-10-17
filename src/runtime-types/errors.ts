@@ -7,3 +7,10 @@ export class ExpectedLiteralError extends Data.TaggedError("ExpectedLiteralError
 export class CouldNotFindLiteralError extends Data.TaggedError("CouldNotFindLiteralError")<{
     message?: string;
 }> {}
+
+export class DecodeError extends Data.TaggedError("DecodeError")<{
+    index: number;
+    raw: string;
+    cause: unknown;
+    message?: string;
+}> {}
