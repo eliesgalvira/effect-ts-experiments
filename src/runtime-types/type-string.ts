@@ -53,16 +53,17 @@ export function typedString() {
             const decoded = yield* Schema
               .decodeUnknown(schemas[i]!)(raw)
               .pipe(
-                Effect.catchAll((cause) =>
-                  Effect.fail(
-                    new DecodeError({
-                      index: i,
-                      raw,
-                      cause,
-                      message: `Failed to decode placeholder #${i}`,
-                    })
-                  )
-                )
+                Effect.catchTags({
+                  ParseError: (cause) =>
+                    Effect.fail(
+                      new DecodeError({
+                        index: i,
+                        raw,
+                        cause,
+                        message: `Failed to decode placeholder #${i}`,
+                      })
+                    ),
+                })
               );
             results.push(decoded);
             pos = nextPos;
