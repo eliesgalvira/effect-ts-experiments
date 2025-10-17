@@ -14,6 +14,7 @@ export function typedString() {
     ) =>
     (input: string) =>
       Effect.gen(function* () {
+        // This only gets triggered if you directly call the function with no template literals
         if (schemas.length !== strings.length - 1) {
           return yield* Effect.fail(
             new CouldNotFindLiteralError({
@@ -41,6 +42,7 @@ export function typedString() {
             const nextLiteral = strings[i + 1]!;
             const nextPos = nextLiteral ? input.indexOf(nextLiteral, pos) : input.length;
 
+            // String.indexOf returns -1 if the substring is not found
             if (nextPos === -1) {
               return yield* Effect.fail(
                 new CouldNotFindLiteralError({
@@ -49,6 +51,7 @@ export function typedString() {
               );
             }
 
+            // Slice input from `pos` up to, but not including, `nextPos`
             const raw = input.slice(pos, nextPos);
             const decoded = yield* Schema
               .decodeUnknown(schemas[i]!)(raw)
@@ -87,7 +90,7 @@ export function typedString() {
 const matcher = typedString()`example/${Schema.NumberFromString}what&${Schema.NumberFromString}`;
 
 const program = Effect.gen(function* () {
-  const result = yield* matcher(`example/4what&3`);
+  const result = yield* matcher("example/4what&3");
   return result;
 });
 
