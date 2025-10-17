@@ -14,3 +14,8 @@ export class DecodeError extends Data.TaggedError("DecodeError")<{
     cause: unknown;
     message?: string;
 }> {}
+
+export class DecodeErrors extends Data.TaggedError("DecodeErrors")<{
+    errors: ReadonlyArray<DecodeError>;
+    message?: string;
+}> {}

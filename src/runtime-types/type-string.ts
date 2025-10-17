@@ -3,6 +3,7 @@ import {
   ExpectedLiteralError,
   CouldNotFindLiteralError,
   DecodeError,
+  DecodeErrors,
 } from "./errors.ts";
 
 type StringSchema = Schema.Schema<any, string, never>;
@@ -35,7 +36,7 @@ export function typedString() {
 
           return Effect.reduce(
             segments,
-            { pos: 0, results: [] as unknown[] },
+            { pos: 0, results: [] as unknown[], errors: [] as DecodeError[] },
             (state, seg) =>
               Effect.succeed(state).pipe(
                 Effect.filterOrFail(
@@ -61,21 +62,26 @@ export function typedString() {
                 Effect.flatMap((s) => {
                   const raw = input.slice(s.pos, s.nextPos);
                   return Schema.decodeUnknown(seg.schema)(raw).pipe(
-                    Effect.catchTags({
-                      ParseError: (cause) =>
-                        Effect.fail(
+                    Effect.match({
+                      onFailure: (cause) => ({
+                        pos: s.nextPos,
+                        results: [...s.results, undefined],
+                        errors: [
+                          ...s.errors,
                           new DecodeError({
                             index: seg.index,
                             raw,
                             cause,
                             message: `Failed to decode placeholder #${seg.index}`,
-                          })
-                        ),
-                    }),
-                    Effect.map((decoded) => ({
-                      pos: s.nextPos,
-                      results: [...s.results, decoded],
-                    }))
+                          }),
+                        ],
+                      }),
+                      onSuccess: (decoded) => ({
+                        pos: s.nextPos,
+                        results: [...s.results, decoded],
+                        errors: s.errors,
+                      }),
+                    })
                   );
                 })
               )
@@ -101,7 +107,16 @@ export function typedString() {
                   )} at position ${s.pos}`,
                 })
             ),
-            Effect.map((s) => s.results as Readonly<OutTuple<Schemas>>)
+            Effect.flatMap((s) =>
+              s.errors.length > 0
+                ? Effect.fail(
+                    new DecodeErrors({
+                      errors: s.errors,
+                      message: `${s.errors.length} placeholder(s) failed to decode`,
+                    })
+                  )
+                : Effect.succeed(s.results as Readonly<OutTuple<Schemas>>)
+            )
           );
         })
       );
@@ -110,7 +125,7 @@ export function typedString() {
 const matcher = typedString()`example/${Schema.NumberFromString}what&${Schema.NumberFromString}/end`;
 
 const program = Effect.gen(function* () {
-  const result = yield* matcher("example/4what&3/end");
+  const result = yield* matcher("example/what&/end");
   return result;
 });
 
@@ -120,8 +135,8 @@ const main = program.pipe(
       Effect.succeed(error.message),
     CouldNotFindLiteralError: (error: CouldNotFindLiteralError) =>
       Effect.succeed(error.message),
-    DecodeError: (error: DecodeError) =>
-      Effect.succeed({ message: error.message, cause: error.cause }),
+    DecodeErrors: (error: DecodeErrors) =>
+      Effect.succeed({ message: error.message, errors: error.errors }),
   }),
   Effect.tap(Console.log)
 );
