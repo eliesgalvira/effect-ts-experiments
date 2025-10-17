@@ -125,7 +125,7 @@ export function typedString() {
 const matcher = typedString()`example/${Schema.NumberFromString}what&${Schema.NumberFromString}/end`;
 
 const program = Effect.gen(function* () {
-  const result = yield* matcher("example/what&/end");
+  const result = yield* matcher("example/whatwhat&stick/end");
   return result;
 });
 
