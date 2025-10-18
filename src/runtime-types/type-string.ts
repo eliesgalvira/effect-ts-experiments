@@ -53,47 +53,47 @@ export function typedString() {
 
     return <CheckString extends string>(input: CheckString) =>
       Effect.gen(function* () {
-        let pos = 0;
-        const errors: DecodeError[] = [];
+        let currentPosition = 0;
+        const decodeErrors: DecodeError[] = [];
 
-        for (const seg of segments) {
+        for (const segment of segments) {
 
-          if (!input.startsWith(seg.literal, pos)) {
+          if (!input.startsWith(segment.literal, currentPosition)) {
             return yield* Effect.fail(
               new ExpectedLiteralError({
-                message: `Expected "${seg.literal}" at position ${pos}`,
+                message: `Expected "${segment.literal}" at position ${currentPosition}`,
               })
             );
           }
-          pos += seg.literal.length;
-          const nextPos = seg.nextLiteral
-            ? input.indexOf(seg.nextLiteral, pos)
+          currentPosition += segment.literal.length;
+          const nextLiteralPosition = segment.nextLiteral
+            ? input.indexOf(segment.nextLiteral, currentPosition)
             : input.length;
-          if (nextPos === -1) {
+          if (nextLiteralPosition === -1) {
             return yield* Effect.fail(
               new CouldNotFindLiteralError({
-                message: `Could not find "${seg.nextLiteral}" after position ${pos}`,
+                message: `Could not find "${segment.nextLiteral}" after position ${currentPosition}`,
               })
             );
           }
 
-          const raw = input.slice(pos, nextPos);
-          const _ = yield* Schema.decodeUnknown(seg.schema)(raw).pipe(
+          const rawInputForPlaceholder = input.slice(currentPosition, nextLiteralPosition);
+          yield* Schema.decodeUnknown(segment.schema)(rawInputForPlaceholder).pipe(
             Effect.catchTags({
-              ParseError: (cause) =>
+              ParseError: (parseError) =>
                 Effect.succeed(
-                  errors.push(
+                  decodeErrors.push(
                     new DecodeError({
-                      index: seg.index,
-                      raw,
-                      cause,
-                      message: `Failed to decode placeholder #${seg.index}`,
+                      index: segment.index,
+                      raw: rawInputForPlaceholder,
+                      cause: parseError,
+                      message: `Failed to decode placeholder #${segment.index}`,
                     })
                   )
                 )
             })
           );
-          pos = nextPos;
+          currentPosition = nextLiteralPosition;
         }
 
         const finalLiteral = strings[strings.length - 1];
@@ -102,29 +102,29 @@ export function typedString() {
             new MissingTemplateSliceError({ index: strings.length - 1, which: "final", message: `Missing final literal` })
           );
         }
-        if (!input.startsWith(finalLiteral, pos)) {
+        if (!input.startsWith(finalLiteral, currentPosition)) {
           return yield* Effect.fail(
             new ExpectedLiteralError({
-              message: `Expected final "${finalLiteral}" at position ${pos}`,
+              message: `Expected final "${finalLiteral}" at position ${currentPosition}`,
             })
           );
         }
-        pos += finalLiteral.length;
+        currentPosition += finalLiteral.length;
 
-        if (pos !== input.length) {
-          const trailing = input.slice(pos);
+        if (currentPosition !== input.length) {
+          const trailingContent = input.slice(currentPosition);
           return yield* Effect.fail(
             new ExpectedLiteralError({
-              message: `Unexpected trailing content ${JSON.stringify(trailing)} at position ${pos}`,
+              message: `Unexpected trailing content ${JSON.stringify(trailingContent)} at position ${currentPosition}`,
             })
           );
         }
 
-        if (errors.length > 0) {
+        if (decodeErrors.length > 0) {
           return yield* Effect.fail(
             new DecodeErrors({
-              errors,
-              message: `${errors.length} placeholder(s) failed to decode`,
+              errors: decodeErrors,
+              message: `${decodeErrors.length} placeholder(s) failed to decode`,
             })
           );
         }
