@@ -9,8 +9,75 @@ import {
   TemplateAmbiguityError,
 } from "./errors.ts";
 
+/**
+ * A Schema that decodes from a string input.
+ *
+ * @category Types
+ */
 type StringSchema = Schema.Schema<any, string, never>;
 
+/**
+ * Determines what part of a template segment is missing.
+ *
+ * @internal
+ */
+const getMissingSegmentPart = (
+  literal: string | undefined,
+  nextLiteral: string | undefined
+): "literal" | "next" | "both" => {
+  if (literal === undefined && nextLiteral === undefined) return "both";
+  if (literal === undefined) return "literal";
+  return "next";
+};
+
+/**
+ * Internal representation of a template segment between two literals.
+ * Each segment contains the leading literal, the schema to decode the dynamic part,
+ * the next literal delimiter, and the segment index.
+ *
+ * @category Types
+ */
+interface TemplateSegment {
+  readonly literal: string;
+  readonly schema: StringSchema;
+  readonly nextLiteral: string;
+  readonly index: number;
+}
+
+/**
+ * Creates a typed string matcher from a template literal with embedded schemas.
+ *
+ * **Details**
+ *
+ * This function enables runtime validation of strings against a template pattern
+ * where placeholders are validated using Effect Schema. The template is defined
+ * at compile-time using tagged template literals.
+ *
+ * The function performs validation in two phases:
+ * 1. **Definition-time**: Validates the template structure (placeholder count, ambiguity)
+ * 2. **Runtime**: Validates input strings against the template and decodes placeholders
+ *
+ * **Example**
+ *
+ * ```ts
+ * import { Schema, Effect } from "effect"
+ * import { typedString } from "./type-string"
+ *
+ * // Define a matcher for route patterns
+ * const matcherEffect = typedString()`route/${Schema.NumberFromString}/end`
+ *
+ * const program = Effect.gen(function* () {
+ *   const matcher = yield* matcherEffect
+ *   const result = yield* matcher("route/42/end")
+ *   return result // "route/42/end"
+ * })
+ * ```
+ *
+ * @returns A function that accepts a template literal with schemas and returns
+ *          an Effect that produces a matcher function
+ *
+ * @category Constructors
+ */
 export function typedString() {
   return <const Schemas extends readonly StringSchema[]>(
       strings: TemplateStringsArray,
@@ -24,20 +91,13 @@ export function typedString() {
     }
 
     // Build segments once and validate while building
-    const segments: Array<{
-      readonly literal: string;
-      readonly schema: StringSchema;
-      readonly nextLiteral: string;
-      readonly index: number;
-    }> = [];
+    const segments: Array<TemplateSegment> = [];
 
     for (let i = 0; i < schemas.length; i++) {
       const literal = strings[i];
       const nextLiteral = strings[i + 1];
       if (literal === undefined || nextLiteral === undefined) {
-        const missing = literal === undefined && nextLiteral === undefined
-          ? "both" as const
-          : literal === undefined ? "literal" as const : "next" as const;
+        const missing = getMissingSegmentPart(literal, nextLiteral);
         return yield* Effect.fail(new SegmentTemplateError({ index: i, missing, message: `Segment ${i} is missing ${missing}` }));
       }
       if (i >= 1 && i < strings.length - 1 && strings[i] === "") {
@@ -134,11 +194,11 @@ export function typedString() {
   });
 }
 
-const matcherEffect = typedString()`route/${Schema.NumberFromString}/end`;
+const typedStringCheckerEffect = typedString()`route/${Schema.NumberFromString}/end`;
 
 const program = Effect.gen(function* () {
-  const matcher = yield* matcherEffect;
-  const result = yield* matcher("route/3/end");
+  const typedStringChecker = yield* typedStringCheckerEffect;
+  const result = yield* typedStringChecker("route/3/end");
   return result;
 });
 
