@@ -4,21 +4,20 @@ import {
   CouldNotFindLiteralError,
   DecodeError,
   DecodeErrors,
+  MissingTemplateSliceError,
+  SegmentTemplateError,
 } from "./errors.ts";
 
 type StringSchema = Schema.Schema<any, string, never>;
-type InferA<X> = X extends Schema.Schema<infer A, any, any> ? A : never;
-type OutTuple<S extends readonly Schema.Schema<any, any, any>[]> = {
-  readonly [K in keyof S]: InferA<S[K]>;
-};
 
 export function typedString() {
   return <const Schemas extends readonly StringSchema[]>(
       strings: TemplateStringsArray,
       ...schemas: Schemas
     ) =>
-    (input: string) =>
+    <CheckString extends string>(input: CheckString) =>
       Effect.gen(function* () {
+        console.log(strings, schemas);
         // only in case higher order function is not called with template literal in the argument
         if (schemas.length !== strings.length - 1) {
           return yield* Effect.fail(
@@ -29,9 +28,9 @@ export function typedString() {
         }
 
         const segments = schemas.map((schema, i) => ({
-          literal: strings[i]!,
+          literal: strings[i],
           schema,
-          nextLiteral: strings[i + 1]!,
+          nextLiteral: strings[i + 1],
           index: i,
         }));
 
@@ -40,6 +39,15 @@ export function typedString() {
         const errors: DecodeError[] = [];
 
         for (const seg of segments) {
+          if (seg.literal === undefined || seg.nextLiteral === undefined) {
+            const missing = seg.literal === undefined && seg.nextLiteral === undefined
+              ? "both" as const
+              : seg.literal === undefined ? "literal" as const : "next" as const;
+            return yield* Effect.fail(
+              new SegmentTemplateError({ index: seg.index, missing, message: `Segment ${seg.index} is missing ${missing}` })
+            );
+          }
+
           if (!input.startsWith(seg.literal, pos)) {
             return yield* Effect.fail(
               new ExpectedLiteralError({
@@ -48,7 +56,6 @@ export function typedString() {
             );
           }
           pos += seg.literal.length;
-
           const nextPos = seg.nextLiteral
             ? input.indexOf(seg.nextLiteral, pos)
             : input.length;
@@ -83,7 +90,12 @@ export function typedString() {
           pos = nextPos;
         }
 
-        const finalLiteral = strings[strings.length - 1]!;
+        const finalLiteral = strings[strings.length - 1];
+        if (finalLiteral === undefined) {
+          return yield* Effect.fail(
+            new MissingTemplateSliceError({ index: strings.length - 1, which: "final", message: `Missing final literal` })
+          );
+        }
         if (!input.startsWith(finalLiteral, pos)) {
           return yield* Effect.fail(
             new ExpectedLiteralError({
@@ -111,14 +123,14 @@ export function typedString() {
           );
         }
 
-        return results as Readonly<OutTuple<Schemas>>;
+        return input;
       });
 }
 
-const matcher = typedString()`example/${Schema.NumberFromString}what&${Schema.NumberFromString}/end`;
+const matcher = typedString()`${Schema.NumberFromString}/end`;
 
 const program = Effect.gen(function* () {
-  const result = yield* matcher("example/whatwhat&stick/end");
+  const result = yield* matcher("63/end");
   return result;
 });
 
