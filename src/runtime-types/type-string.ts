@@ -15,34 +15,41 @@ export function typedString() {
   return <const Schemas extends readonly StringSchema[]>(
       strings: TemplateStringsArray,
       ...schemas: Schemas
-    ) => {
+    ) => Effect.gen(function* () {
     // Definition-time checks
     if (schemas.length !== strings.length - 1) {
-      throw new CouldNotFindLiteralError({
-        message: `Template placeholders mismatch: got ${schemas.length} schemas for ${strings.length} literals`,
-      });
+      return yield* Effect.fail(new CouldNotFindLiteralError({
+        message: `Template placeholders mismatch: got ${schemas.length} schemas for ${schemas.length} literals`,
+      }));
     }
 
     // Build segments once and validate while building
-    const segments = Array.from({ length: schemas.length }, (_, i) => {
+    const segments: Array<{
+      readonly literal: string;
+      readonly schema: StringSchema;
+      readonly nextLiteral: string;
+      readonly index: number;
+    }> = [];
+
+    for (let i = 0; i < schemas.length; i++) {
       const literal = strings[i];
       const nextLiteral = strings[i + 1];
       if (literal === undefined || nextLiteral === undefined) {
         const missing = literal === undefined && nextLiteral === undefined
           ? "both" as const
           : literal === undefined ? "literal" as const : "next" as const;
-        throw new SegmentTemplateError({ index: i, missing, message: `Segment ${i} is missing ${missing}` });
+        return yield* Effect.fail(new SegmentTemplateError({ index: i, missing, message: `Segment ${i} is missing ${missing}` }));
       }
       if (i >= 1 && i < strings.length - 1 && strings[i] === "") {
-        throw new TemplateAmbiguityError({ index: i, message: `Ambiguous template: empty internal slice at index ${i}` });
+        return yield* Effect.fail(new TemplateAmbiguityError({ index: i, message: `Ambiguous template: empty internal slice at index ${i}` }));
       }
-      return {
+      segments.push({
         literal,
         schema: schemas[i] as StringSchema,
         nextLiteral,
         index: i,
-      } as const;
-    });
+      });
+    }
 
     return <CheckString extends string>(input: CheckString) =>
       Effect.gen(function* () {
@@ -124,13 +131,14 @@ export function typedString() {
 
         return input;
       });
-  };
+  });
 }
 
-const matcher = typedString()`${Schema.NumberFromString}${Schema.NumberFromString}`;
+const matcherEffect = typedString()`route/${Schema.NumberFromString}/end`;
 
 const program = Effect.gen(function* () {
-  const result = yield* matcher("63");
+  const matcher = yield* matcherEffect;
+  const result = yield* matcher("route/3/end");
   return result;
 });
 
@@ -142,7 +150,13 @@ const main = program.pipe(
       Effect.succeed(error.message),
     DecodeErrors: (error: DecodeErrors) =>
       Effect.succeed({ message: error.message, errors: error.errors }),
-  }),
+    SegmentTemplateError: (error: SegmentTemplateError) =>
+      Effect.succeed({ message: error.message, index: error.index, missing: error.missing }),
+    TemplateAmbiguityError: (error: TemplateAmbiguityError) =>
+      Effect.succeed({ message: error.message, index: error.index }),
+    MissingTemplateSliceError: (error: MissingTemplateSliceError) =>
+      Effect.succeed({ message: error.message, index: error.index, which: error.which }),
+  } as const),
   Effect.tap(Console.log)
 );
 
