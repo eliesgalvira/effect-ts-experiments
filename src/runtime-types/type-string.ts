@@ -19,7 +19,7 @@ export function typedString() {
     // Definition-time checks
     if (schemas.length !== strings.length - 1) {
       return yield* Effect.fail(new CouldNotFindLiteralError({
-        message: `Template placeholders mismatch: got ${schemas.length} schemas for ${schemas.length} literals`,
+        message: `Template placeholders mismatch: got ${schemas.length} schemas for ${strings.length} literals`,
       }));
     }
 
