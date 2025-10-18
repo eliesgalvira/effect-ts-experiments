@@ -31,3 +31,8 @@ export class SegmentTemplateError extends Data.TaggedError("SegmentTemplateError
     missing: "literal" | "next" | "both";
     message?: string;
 }> {}
+
+export class TemplateAmbiguityError extends Data.TaggedError("TemplateAmbiguityError")<{
+    index: number;
+    message?: string;
+}> {}

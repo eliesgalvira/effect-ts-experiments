@@ -6,6 +6,7 @@ import {
   DecodeErrors,
   MissingTemplateSliceError,
   SegmentTemplateError,
+  TemplateAmbiguityError,
 } from "./errors.ts";
 
 type StringSchema = Schema.Schema<any, string, never>;
@@ -14,39 +15,41 @@ export function typedString() {
   return <const Schemas extends readonly StringSchema[]>(
       strings: TemplateStringsArray,
       ...schemas: Schemas
-    ) =>
-    <CheckString extends string>(input: CheckString) =>
+    ) => {
+    // Definition-time checks
+    if (schemas.length !== strings.length - 1) {
+      throw new CouldNotFindLiteralError({
+        message: `Template placeholders mismatch: got ${schemas.length} schemas for ${strings.length} literals`,
+      });
+    }
+
+    // Build segments once and validate while building
+    const segments = Array.from({ length: schemas.length }, (_, i) => {
+      const literal = strings[i];
+      const nextLiteral = strings[i + 1];
+      if (literal === undefined || nextLiteral === undefined) {
+        const missing = literal === undefined && nextLiteral === undefined
+          ? "both" as const
+          : literal === undefined ? "literal" as const : "next" as const;
+        throw new SegmentTemplateError({ index: i, missing, message: `Segment ${i} is missing ${missing}` });
+      }
+      if (i >= 1 && i < strings.length - 1 && strings[i] === "") {
+        throw new TemplateAmbiguityError({ index: i, message: `Ambiguous template: empty internal slice at index ${i}` });
+      }
+      return {
+        literal,
+        schema: schemas[i] as StringSchema,
+        nextLiteral,
+        index: i,
+      } as const;
+    });
+
+    return <CheckString extends string>(input: CheckString) =>
       Effect.gen(function* () {
-        console.log(strings, schemas);
-        // only in case higher order function is not called with template literal in the argument
-        if (schemas.length !== strings.length - 1) {
-          return yield* Effect.fail(
-            new CouldNotFindLiteralError({
-              message: `Template placeholders mismatch: got ${schemas.length} schemas for ${strings.length} literals`,
-            })
-          );
-        }
-
-        const segments = schemas.map((schema, i) => ({
-          literal: strings[i],
-          schema,
-          nextLiteral: strings[i + 1],
-          index: i,
-        }));
-
         let pos = 0;
-        const results: unknown[] = [];
         const errors: DecodeError[] = [];
 
         for (const seg of segments) {
-          if (seg.literal === undefined || seg.nextLiteral === undefined) {
-            const missing = seg.literal === undefined && seg.nextLiteral === undefined
-              ? "both" as const
-              : seg.literal === undefined ? "literal" as const : "next" as const;
-            return yield* Effect.fail(
-              new SegmentTemplateError({ index: seg.index, missing, message: `Segment ${seg.index} is missing ${missing}` })
-            );
-          }
 
           if (!input.startsWith(seg.literal, pos)) {
             return yield* Effect.fail(
@@ -68,25 +71,21 @@ export function typedString() {
           }
 
           const raw = input.slice(pos, nextPos);
-          const decoded = yield* Schema.decodeUnknown(seg.schema)(raw).pipe(
-            Effect.match({
-              onFailure: (cause) =>
-                new DecodeError({
-                  index: seg.index,
-                  raw,
-                  cause,
-                  message: `Failed to decode placeholder #${seg.index}`,
-                }),
-              onSuccess: (a) => a,
+          const _ = yield* Schema.decodeUnknown(seg.schema)(raw).pipe(
+            Effect.catchTags({
+              ParseError: (cause) =>
+                Effect.succeed(
+                  errors.push(
+                    new DecodeError({
+                      index: seg.index,
+                      raw,
+                      cause,
+                      message: `Failed to decode placeholder #${seg.index}`,
+                    })
+                  )
+                )
             })
           );
-
-          if (decoded instanceof DecodeError) {
-            errors.push(decoded);
-            results.push(undefined);
-          } else {
-            results.push(decoded);
-          }
           pos = nextPos;
         }
 
@@ -125,12 +124,13 @@ export function typedString() {
 
         return input;
       });
+  };
 }
 
-const matcher = typedString()`${Schema.NumberFromString}/end`;
+const matcher = typedString()`${Schema.NumberFromString}${Schema.NumberFromString}`;
 
 const program = Effect.gen(function* () {
-  const result = yield* matcher("63/end");
+  const result = yield* matcher("63");
   return result;
 });
 
