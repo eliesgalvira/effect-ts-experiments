@@ -18,108 +18,101 @@ export function typedString() {
       ...schemas: Schemas
     ) =>
     (input: string) =>
-      Effect.succeed({ schemas, strings, input }).pipe(
-        Effect.filterOrFail(
-          ({ schemas, strings }) => schemas.length === strings.length - 1,
-          () =>
+      Effect.gen(function* () {
+        // only in case higher order function is not called with template literal in the argument
+        if (schemas.length !== strings.length - 1) {
+          return yield* Effect.fail(
             new CouldNotFindLiteralError({
               message: `Template placeholders mismatch: got ${schemas.length} schemas for ${strings.length} literals`,
             })
-        ),
-        Effect.flatMap(({ schemas, strings, input }) => {
-          const segments = schemas.map((schema, i) => ({
-            literal: strings[i]!,
-            schema,
-            nextLiteral: strings[i + 1]!,
-            index: i,
-          }));
+          );
+        }
 
-          return Effect.reduce(
-            segments,
-            { pos: 0, results: [] as unknown[], errors: [] as DecodeError[] },
-            (state, seg) =>
-              Effect.succeed(state).pipe(
-                Effect.filterOrFail(
-                  (s) => input.startsWith(seg.literal, s.pos),
-                  () =>
-                    new ExpectedLiteralError({
-                      message: `Expected "${seg.literal}" at position ${state.pos}`,
-                    })
-                ),
-                Effect.map((s) => ({ ...s, pos: s.pos + seg.literal.length })),
-                Effect.flatMap((s) => {
-                  const nextPos = seg.nextLiteral
-                    ? input.indexOf(seg.nextLiteral, s.pos)
-                    : input.length;
-                  return nextPos === -1
-                    ? Effect.fail(
-                        new CouldNotFindLiteralError({
-                          message: `Could not find "${seg.nextLiteral}" after position ${s.pos}`,
-                        })
-                      )
-                    : Effect.succeed({ ...s, nextPos });
+        const segments = schemas.map((schema, i) => ({
+          literal: strings[i]!,
+          schema,
+          nextLiteral: strings[i + 1]!,
+          index: i,
+        }));
+
+        let pos = 0;
+        const results: unknown[] = [];
+        const errors: DecodeError[] = [];
+
+        for (const seg of segments) {
+          if (!input.startsWith(seg.literal, pos)) {
+            return yield* Effect.fail(
+              new ExpectedLiteralError({
+                message: `Expected "${seg.literal}" at position ${pos}`,
+              })
+            );
+          }
+          pos += seg.literal.length;
+
+          const nextPos = seg.nextLiteral
+            ? input.indexOf(seg.nextLiteral, pos)
+            : input.length;
+          if (nextPos === -1) {
+            return yield* Effect.fail(
+              new CouldNotFindLiteralError({
+                message: `Could not find "${seg.nextLiteral}" after position ${pos}`,
+              })
+            );
+          }
+
+          const raw = input.slice(pos, nextPos);
+          const decoded = yield* Schema.decodeUnknown(seg.schema)(raw).pipe(
+            Effect.match({
+              onFailure: (cause) =>
+                new DecodeError({
+                  index: seg.index,
+                  raw,
+                  cause,
+                  message: `Failed to decode placeholder #${seg.index}`,
                 }),
-                Effect.flatMap((s) => {
-                  const raw = input.slice(s.pos, s.nextPos);
-                  return Schema.decodeUnknown(seg.schema)(raw).pipe(
-                    Effect.match({
-                      onFailure: (cause) => ({
-                        pos: s.nextPos,
-                        results: [...s.results, undefined],
-                        errors: [
-                          ...s.errors,
-                          new DecodeError({
-                            index: seg.index,
-                            raw,
-                            cause,
-                            message: `Failed to decode placeholder #${seg.index}`,
-                          }),
-                        ],
-                      }),
-                      onSuccess: (decoded) => ({
-                        pos: s.nextPos,
-                        results: [...s.results, decoded],
-                        errors: s.errors,
-                      }),
-                    })
-                  );
-                })
-              )
+              onSuccess: (a) => a,
+            })
           );
-        }),
-        Effect.flatMap((state) => {
-          const finalLiteral = strings[strings.length - 1]!;
-          return Effect.succeed(state).pipe(
-            Effect.filterOrFail(
-              (s) => input.startsWith(finalLiteral, s.pos),
-              () =>
-                new ExpectedLiteralError({
-                  message: `Expected final "${finalLiteral}" at position ${state.pos}`,
-                })
-            ),
-            Effect.map((s) => ({ ...s, pos: s.pos + finalLiteral.length })),
-            Effect.filterOrFail(
-              (s) => s.pos === input.length,
-              (s) =>
-                new ExpectedLiteralError({
-                  message: `Unexpected trailing content ${JSON.stringify(
-                    input.slice(s.pos)
-                  )} at position ${s.pos}`,
-                })
-            ),
-            Effect.flatMap((s) =>
-              s.errors.length > 0
-                ? Effect.fail(
-                    new DecodeErrors({
-                      errors: s.errors,
-                      message: `${s.errors.length} placeholder(s) failed to decode`,
-                    })
-                  )
-                : Effect.succeed(s.results as Readonly<OutTuple<Schemas>>)
-            )
+
+          if (decoded instanceof DecodeError) {
+            errors.push(decoded);
+            results.push(undefined);
+          } else {
+            results.push(decoded);
+          }
+          pos = nextPos;
+        }
+
+        const finalLiteral = strings[strings.length - 1]!;
+        if (!input.startsWith(finalLiteral, pos)) {
+          return yield* Effect.fail(
+            new ExpectedLiteralError({
+              message: `Expected final "${finalLiteral}" at position ${pos}`,
+            })
           );
-        })
-      );
+        }
+        pos += finalLiteral.length;
+
+        if (pos !== input.length) {
+          const trailing = input.slice(pos);
+          return yield* Effect.fail(
+            new ExpectedLiteralError({
+              message: `Unexpected trailing content ${JSON.stringify(trailing)} at position ${pos}`,
+            })
+          );
+        }
+
+        if (errors.length > 0) {
+          return yield* Effect.fail(
+            new DecodeErrors({
+              errors,
+              message: `${errors.length} placeholder(s) failed to decode`,
+            })
+          );
+        }
+
+        return results as Readonly<OutTuple<Schemas>>;
+      });
 }
 
 const matcher = typedString()`example/${Schema.NumberFromString}what&${Schema.NumberFromString}/end`;
