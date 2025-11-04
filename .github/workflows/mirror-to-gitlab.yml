@@ -1,4 +1,5 @@
 name: Mirror to GitLab
+
 on:
   push:
     branches: ["**"]
@@ -28,16 +29,27 @@ jobs:
       - name: Configure Git safe.directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Fetch all branches/tags
+      - name: Prepare local refs for mirror
         run: |
+          # Ensure local branches exist for all origin refs so --mirror pushes everything
           git fetch --prune --tags origin
+          git for-each-ref --format='%(refname:short)' refs/remotes/origin \
+            | sed 's#^origin/##' \
+            | while read -r b; do
+                [ "$b" = "HEAD" ] && continue
+                git show-ref --verify --quiet "refs/heads/$b" || git branch --track "$b" "origin/$b" || true
+              done
 
-      - name: Push mirror to GitLab (heads/tags/notes only)
+      - name: Push mirror to GitLab
         env:
           MIRROR_URL: ${{ secrets.MIRROR_URL }}
         run: |
           git remote remove mirror 2>/dev/null || true
           git remote add mirror "$MIRROR_URL"
+
+          # Push branches and tags; ignore remote-tracking refs and HEAD
           git push --prune mirror +refs/heads/*:refs/heads/* +refs/tags/*:refs/tags/*
+
+          # Optional: if you use git notes and want them mirrored too:
           git push --prune mirror +refs/notes/*:refs/notes/* || true
 
